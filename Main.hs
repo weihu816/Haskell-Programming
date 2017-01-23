@@ -389,13 +389,9 @@ tsplitBy = "splitBy" ~: TestList [
 weather :: String -> String
 weather str =
   fst (
-    getMin (
-      map (\x -> ((x !! 0), (getInt (x !! 1)) - (getInt (x !! 2)))) (
-        map (\x -> (filter (\t ->length t>0) (splitBy isSpace x)))
-        (slice 2 (lines str))
-      )
-    )
-  )
+    getMin (map (\x -> (head x, getInt (x !! 1) - getInt (x !! 2))) dt)
+  ) where
+    dt = map (filter (not . null) . splitBy isSpace) (slice 2 (lines str))
     
 
 weatherProgram :: IO ()
@@ -416,13 +412,13 @@ testWeather = "weather" ~: do str <- readFile "weather.dat"
 soccer :: String -> String
 soccer str = fst (
     getMin (
-      map (\x -> ((x !! 1), abs((getInt (x !! 6)) - (getInt (x !! 8))))) (
-        map (\x -> (filter (\t ->length t>0) (splitBy isSpace x)))
-        ((mySlice 1 17 strs) ++ (mySlice 19 (length strs - 1) strs))
-      )
+      map (\x -> (x !! 1, abs(getInt (x !! 6) - getInt (x !! 8)))) dt
     )
   )
-  where strs = (lines str)
+  where 
+    strs = lines str
+    dt = map (filter (not . null) . splitBy isSpace)
+      (mySlice 1 17 strs ++ mySlice 19 (length strs - 1) strs)
  
 
 soccerProgram :: IO ()
@@ -442,31 +438,30 @@ weather2 :: String -> String
 weather2 str = getMinKey (slice 2 (lines str)) 0 1 2
  
 soccer2 :: String -> String
-soccer2 str = getMinKey ((mySlice 1 17 strs) ++ (mySlice 19 (length strs - 1) strs))
-  1 6 8 where strs = (lines str)
+soccer2 str = getMinKey (mySlice 1 17 strs ++ mySlice 19 (length strs - 1) strs)
+  1 6 8 where strs = lines str
 
 
 -- Common retrieve method for above two functions
 getMinKey :: [String] -> Int -> Int -> Int -> String
 getMinKey strs a b c = fst (
     getMin (
-      map (\x -> ((x !! a), abs((getInt (x !! b)) - (getInt (x !! c)))))
-      (map (\x -> (filter (\t ->length t>0) (splitBy isSpace x))) strs)
+      map (\x -> (x !! a, abs(getInt (x !! b) - getInt (x !! c)))) dt
     )
-  )
+  ) where dt = map (filter (not . null) . splitBy isSpace) strs
 -- slice an array given from index except the last line
 slice :: Int -> [a] -> [a]
-slice from x = take ((length x) - 1 - from) (drop from x)
+slice from x = take (length x - 1 - from) (drop from x)
 -- parse the integer from string
 getInt :: String -> Int
-getInt x = read (filter (\t -> (Char.isNumber(t) || t == '.')) x) :: Int
+getInt x = read (filter (\t -> Char.isNumber t || t == '.') x) :: Int
 -- custome min temperature range function
 getMin :: [(String, Int)] -> (String, Int)
 getMin l = case l of
   [] -> ("", -1)
-  x:[] -> x
-  x:xs -> if ((snd x) < (snd m)) then x else m
-    where m = (getMin xs)
+  [x] -> x
+  x:xs -> if snd x < snd m then x else m
+    where m = getMin xs
 -- slice an array given from index to index
 mySlice :: Int -> Int -> [a] -> [a]
 mySlice from to x = take (to - from + 1) (drop from x)
