@@ -204,14 +204,14 @@ tall = "all" ~: TestList [
 -- NOTE: map2 is called zipWith in the Prelude
 
 
-map2 :: (a -> b) -> [a] -> [b]
-map2 _ [] = []
-map2 f (x:xs) = f x : map f xs
+map2 :: (a -> b -> c) -> [a] -> [b] -> [c]
+map2 f (x:xs) (y:ys) = f x y : (map2 f xs ys)
+map2 f _ _ = []
 
 tmap2 :: Test
 tmap2 = "map2" ~: TestList [
-  map2 (+1) [0,1,2] ~?= [1,2,3],
-  map2 (*2) [1,2,3] ~?= [2,4,6] ]
+  map2 (+) [0,1,2] [1,2] ~?= [1,3],
+  map2 (*) [1,1,2] [1,2,3] ~?= [1,2,6] ]
 
 
 -- zip takes two lists and returns a list of corresponding pairs. If
@@ -391,7 +391,9 @@ weather str =
   fst (
     getMin (map (\x -> (head x, getInt (x !! 1) - getInt (x !! 2))) dt)
   ) where
-    dt = map (filter (not . null) . splitBy isSpace) (slice 2 (lines str))
+    strs = lines str
+    dt = map (filter (not . null) . splitBy isSpace)
+      (mySlice 2 (length strs - 2) strs)
     
 
 weatherProgram :: IO ()
@@ -435,11 +437,16 @@ testSoccer = "soccer" ~: do
 -- Part Three: DRY Fusion
 
 weather2 :: String -> String
-weather2 str = getMinKey (slice 2 (lines str)) 0 1 2
+weather2 str = getMinKey ss 0 1 2
+  where 
+    strs = lines str
+    ss = (mySlice 2 (length strs - 2) strs)
  
 soccer2 :: String -> String
-soccer2 str = getMinKey (mySlice 1 17 strs ++ mySlice 19 (length strs - 1) strs)
-  1 6 8 where strs = lines str
+soccer2 str = getMinKey ss 1 6 8 
+  where 
+    strs = lines str
+    ss = (mySlice 1 17 strs ++ mySlice 19 (length strs - 1) strs)
 
 
 -- Common retrieve method for above two functions
@@ -449,9 +456,6 @@ getMinKey strs a b c = fst (
       map (\x -> (x !! a, abs(getInt (x !! b) - getInt (x !! c)))) dt
     )
   ) where dt = map (filter (not . null) . splitBy isSpace) strs
--- slice an array given from index except the last line
-slice :: Int -> [a] -> [a]
-slice from x = take (length x - 1 - from) (drop from x)
 -- parse the integer from string
 getInt :: String -> Int
 getInt x = read (filter (\t -> Char.isNumber t || t == '.') x) :: Int
@@ -465,6 +469,8 @@ getMin l = case l of
 -- slice an array given from index to index
 mySlice :: Int -> Int -> [a] -> [a]
 mySlice from to x = take (to - from + 1) (drop from x)
+
+
 -- Kata Questions
 
 
@@ -487,7 +493,7 @@ shortAnswer2 = "Yes, largely. I was influenced the way to think about how to\
 -- Is factoring out as much common code as possible always a good thing? Did the
 -- readability of the programs suffer because of this requirement? How about the
 -- maintainability?
- 
+
 shortAnswer3 :: String
 shortAnswer3 = "I would say that it depends, but it usually should always be\
 \ a good design. Usually, this can increase readability of the program because\
