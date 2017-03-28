@@ -1,3 +1,7 @@
+
+
+
+ 
 A Generic State Transformer
 ===========================
 
@@ -15,7 +19,7 @@ listed below will be visible to clients of the module.  Furthermore, the type
 `State` is exported abstractly. Clients of this module will not have access to
 the constructor for this type, nor be able to pattern match it.
 
-> module State (State,  get, put, state, runState, evalState, execState) where
+> module State (State,  get, put, modify, state, runState, evalState, execState) where
 > import Control.Monad (ap,liftM)
 
 The type definition for a generic state transformer is very simple:
@@ -33,10 +37,13 @@ type `a`. We make the above a monad by declaring it to be an instance
 of the `Monad` typeclass
 
 > instance Monad (State s) where
->   -- return :: a -> State s a
+>   return :: a -> State s a
 >   return x   =  S $ \s -> (x,s)
+
 >   (>>=) :: State s a -> (a -> State s b) -> State s b
->   st >>= f   =  undefined
+>   st >>= f   = S $ \s -> let (a,s') = runState st s in
+>                              runState (f a) s'
+
 
 Starting with GHC 7.10, all monads must also be a member of `Functor` and
 `Applicative`. However, we can use functions from Control.Monad to define
@@ -55,12 +62,12 @@ There are two other ways of evaluating the state monad. The first only
 returns the final result,
 
 > evalState :: State s a -> s -> a
-> evalState st = undefined
+> evalState st s = fst (runState st s)
 
 and the second only returns the final state.
 
 > execState :: State s a -> s -> s
-> execState st = undefined
+> execState st = snd . (runState st)
 
 
 Accessing and Modifying State
@@ -72,7 +79,7 @@ can easily `get` the *current* state via
 
 
 > get :: State s s
-> get = undefined
+> get = S $ \s -> ( s, s)
 
 
 
@@ -85,7 +92,7 @@ Dually, to *update* the state to some new value `s'` we can write
 the function
 
 > put :: s -> State s ()
-> put s' = undefined
+> put s' = S $ \_ ->  ( ()  , s' )
 
 which denotes an action that ignores (i.e., blows away) the old state
 and replaces it with `s'`. Note that the `put s'` is an action that
@@ -96,7 +103,9 @@ For convenience, there is also the `modify` function that maps an old state to
 a new state *inside* a state monad. The old state is thrown away.
 
 > modify :: (s -> s) -> State s ()
-> modify f = undefined
+> modify f = do
+>      s <- get
+>      put (f s)
 
 
 [1]: http://hackage.haskell.org/packages/archive/mtl/latest/doc/html/Control-Monad-State-Lazy.html#g:2

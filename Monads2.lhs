@@ -5,7 +5,10 @@ Announcements
 -------------
 
 * Homework 6 was due Tuesday [no late penalty for Wed/Thurs]
+     6 groups have already submitted!
 
+* Homework 7 now available, find your new table & partner
+ 
 * Download two files for today: Monads2 and State
 
 
@@ -87,10 +90,10 @@ of type `Int -> Int`:
 > countI :: Tree a -> Int
 > countI t = aux t 0 where
 >   aux :: Tree a -> (Int -> Int)
->   aux (Leaf _)       = \s -> s + 1
->   aux (Branch t1 t2) = \s -> let s' = aux t1 s 
->                                  s''= aux t2 s'
->                              in s
+>   aux (Leaf _)       = \s -> s+1
+>   aux (Branch t1 t2) = \s -> let s'  = aux t1 s
+>                                  s'' = aux t2 s'
+>                              in s''
 
 
 
@@ -114,9 +117,9 @@ result.
 > label1 :: Tree a -> Tree (a, Int)
 > label1 t = fst (aux t 0) where
 >    aux :: Tree a -> Store -> (Tree(a,Int), Store)
->    aux (Leaf x)       s = (Leaf (x, s), s+1)
->    aux (Branch t1 t2) s = let (t1', s') = aux t1 s
->                               (t2', s'') = aux t2 s'
+>    aux (Leaf x)       s = (Leaf (x,s), s+1)
+>    aux (Branch t1 t2) s = let (t1',s')  = aux t1 s
+>                               (t2',s'') = aux t2 s'
 >                           in (Branch t1' t2', s'')
 
 
@@ -156,20 +159,29 @@ parameterized type `ST` is a *monad*.  What are its definitions of
 > label2 :: Tree a -> Tree (a, Int)
 > label2 t = fst (aux t 0) where
 >   aux ::  Tree a -> ST (Tree (a,Int))
->   aux (Leaf x)       = \s -> returnST (Leaf (x,s)) (s+1)
->   aux (Branch t1 t2) = bindST (aux t1) (\t1' -> bindST (aux t2) (\t2' -> returnST (Branch t1' t2')))
+>   aux (Leaf x)       = \s -> (Leaf (x,s), s+1)
+> {-
+>   aux (Branch t1 t2) = \s -> let (t1', s')  = aux t1 s in
+>                              let (t2', s'') = aux t2 s' in
+>                              (Branch t1' t2', s'')
+> -}
+ 
+>   aux (Branch t1 t2) = bindST (aux t1)
+>          (\t1' -> bindST (aux t2)
+>          (\t2' -> returnST (Branch t1' t2')))
 
-
+ 
 How should we fill in the definitions below? How can we rewrite the definition
 of `aux` above to use these definitions?
 
 > -- returnST :: a -> ST a
 > returnST :: a -> Store -> (a, Store)
-> returnST a = (,) a
+> returnST = (,)
 
 > -- bindST :: ST a -> (a -> ST b) -> ST b
 > bindST :: (Store -> (a, Store)) -> (a -> Store -> (b, Store)) -> (Store -> (b, Store))
-> bindST f g = \s -> let (a, s') = f s in g a s'
+> bindST f g = \s -> let (a, s')  = f s
+>                    in g a s'
 
 
 
@@ -234,10 +246,11 @@ apply :: ST2 a -> Store -> (a, Store)
 
 > instance Monad ST2 where
 >   return :: a -> ST2 a
->   return x   = undefined
+>   return x   = S $ \s -> (x,s)
 >
 >   (>>=)  :: ST2 a -> (a -> ST2 b) -> ST2 b
->   st >>= f   = undefined
+>   f >>= g   = S $ \s -> let (a, s')  = apply f s
+>                          in apply (g a) s'
 
    (*Aside*: there is no runtime overhead for manipulating the dummy
    constructor because we defined ST2 using the `newtype` mechanism of
@@ -266,7 +279,7 @@ transformer that simply returns the current state as its result, and
 the next integer as the new state:
 
 > fresh :: ST2 Int  --- Store -> (Int, Store)
-> fresh = undefined
+> fresh = S $ \s -> (s, s+1)
 
 
 
@@ -277,8 +290,17 @@ argument, and returns a state transformer that produces the
 same tree with each leaf labelled by a fresh integer:
 
 > mlabel            :: Tree a -> ST2 (Tree (a,Int))
-> mlabel (Leaf x)       = undefined
-> mlabel (Branch t1 t2) = undefined
+> mlabel (Leaf x)       = do y <- fresh
+>                            return (Leaf (x,y))   -- S $ \s -> (Leaf (x,s), s+1)
+> {-
+> mlabel (Branch t1 t2) = (mlabel t1) >>=
+>          (\t1' -> (mlabel t2) >>=
+>          (\t2' -> return (Branch t1' t2')))
+> -}
+> mlabel (Branch t1 t2) = do
+>          t1' <- mlabel t1
+>          t2' <- mlabel t2
+>          return (Branch t1' t2')
 
 
 Note that the programmer does not have to worry about the tedious
@@ -335,8 +357,10 @@ that the first type argument is the store, while the second is the
 result type of the monadic action.)
 
 > freshS :: State Int Int
-> freshS = undefined
-
+> freshS = do
+>     s <- get               -- get == \s -> (s,s)
+>     () <- put (s + 1)      -- put == \s -> ((), s+1)
+>     return s               -- return == \s -> (s,s)
 
 Now, the labeling function is straightforward
 
@@ -389,13 +413,24 @@ value appears in the tree. (Documentation for the [Data.Map module](http://www.h
 We write an *action* that returns the current index (and increments it):
 
 > freshM :: State (MySt a) Int
-> freshM = undefined
+> freshM = do
+>   m <- get
+>   let i = index m
+>   put (M (i + 1) (freq m))
+>   return i
 
 Similarly, we want an action that updates the frequency of a given
 element `k`.
 
 > updFreqM :: Ord a => a -> State (MySt a) ()
-> updFreqM k = undefined
+> updFreqM k = do
+>    m <- get
+>    let d = freq m
+>    let v = case Map.lookup k d of
+>               Just x  -> x
+>               Nothing -> 0
+>    put (M (index m) (Map.insert k (v + 1) d))
+>    return ()
 
 
 And with these two, we are done
