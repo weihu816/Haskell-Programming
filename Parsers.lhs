@@ -811,7 +811,7 @@ up (rather like fold) and so we could do
 >            rest = many ((,) <$> mulOp <*> factorE1)
 
 > factorE1 :: Parser Int
-> factorE1 = oneNat <|>  ( char '(' *> sumE <* char ')')
+> factorE1 = oneNat <|>  ( char '(' *> sumE1 <* char ')')
 
 The above is indeed left associative:
 
